@@ -1,4 +1,5 @@
 import numpy as np
+import pandas as pd
 import matplotlib.pyplot as plt
 
 #loss functions
@@ -89,7 +90,7 @@ class Network:
             self.weight_error_history.append(np.linalg.norm(weight_update))
             self.bias_error_history.append(np.linalg.norm(bias_update))
     
-    def train(self, X, y, epochs, learning_rate):
+    def train(self, X, y, epochs, learning_rate, print_loss=True):
         for epoch in range(epochs):
 
             output = self.forward(X)
@@ -97,7 +98,7 @@ class Network:
             self.backward(X, y, output, learning_rate)
             
             #loss at every 1000 epochs
-            if epoch % 1000 == 0:
+            if epoch % 1000 == 0 and print_loss:
                 if self.loss_function == "cross_entropy":
                     loss = cross_entropy_loss(y, output)
                 else:
@@ -129,11 +130,65 @@ class Network:
         plt.tight_layout()
         plt.show()
 
+    def predict(self, X):
+        predictions = self.forward(X)
+        return (predictions >= 0.5).astype(int)
+    
+    
+def calculate_accuracy(y_true, y_pred):
+    correct_predictions = np.sum(y_true == y_pred)
+    accuracy = correct_predictions / len(y_true) * 100
+    return accuracy
+
+def perform_tests(path):
+    layers = [2, 4, 4, 1]
+    activations = ["relu", "relu", "sigmoid"]  #"relu", "sigmoid" or "linear"
+    learning_rate = 0.05
+    epochs = 10000
+    seed = 42
+    loss_function = "cross_entropy"  #"cross_entropy" or "mse"
+
+    numbers = [100, 500, 1000, 10000]
+    for num in numbers:
+        train_file_path = path + f"data.simple.train.{num}.csv"
+
+        data = pd.read_csv(train_file_path, delimiter=',', header=0)
+        data = data.sample(frac=1).reset_index(drop=True)
+        X = data[['x', 'y']].to_numpy()
+        y = data['cls'].to_numpy().reshape(-1, 1)
+        y = np.where(y == 1, 0, 1)
+
+        nn = Network(layers, activations, loss_function=loss_function, seed=seed)
+        nn.train(X, y, epochs, learning_rate, False)
+
+        test_file_path = path + f"data.simple.test.{num}.csv"
+
+        data = pd.read_csv(test_file_path, delimiter=',', header=0)
+        X = data[['x', 'y']].to_numpy()
+        y = data['cls'].to_numpy().reshape(-1, 1)
+        y = np.where(y == 1, 0, 1)
+        predictions = nn.predict(X)
+    
+        print(f"Accuracy for data.simple.test.{num}: ", calculate_accuracy(y, predictions), "%")
+
+    return
+
+
 
 if __name__ == "__main__":
     #XOR problem
-    X = np.array([[0, 0], [0, 1], [1, 0], [1, 1]])
-    y = np.array([[0], [1], [1], [0]])
+    # X = np.array([[0, 0], [0, 1], [1, 0], [1, 1]])
+    # y = np.array([[0], [1], [1], [0]])
+
+    folder_path = 'C:/Users/patry/Downloads/projekt1/projekt1/classification/'
+
+    train_file_path = folder_path + f"data.simple.train.100.csv"
+    data = pd.read_csv(train_file_path, delimiter=',', header=0)
+    data = data.sample(frac=1).reset_index(drop=True)
+
+    X = data[['x', 'y']].to_numpy()
+    y = data['cls'].to_numpy().reshape(-1, 1)
+    y = np.where(y == 1, 0, 1)
 
     #parameters
     layers = [2, 4, 4, 1]
@@ -148,4 +203,16 @@ if __name__ == "__main__":
     nn.train(X, y, epochs, learning_rate)
 
     #plot the error history
-    nn.plot_error_history()
+    # nn.plot_error_history()
+
+    test_file_path = folder_path + f"data.simple.test.100.csv"
+    data = pd.read_csv(test_file_path, delimiter=',', header=0)
+    X = data[['x', 'y']].to_numpy()
+    y = data['cls'].to_numpy().reshape(-1, 1)
+    y = np.where(y == 1, 0, 1)
+    predictions = nn.predict(X)
+
+    print("Accuracy: ", calculate_accuracy(y, predictions), "%")
+
+
+    perform_tests(folder_path)
