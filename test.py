@@ -130,20 +130,30 @@ class Network:
         plt.tight_layout()
         plt.show()
 
-    def predict(self, X):
+    def predict(self, X, regression = False):
         predictions = self.forward(X)
-        return (predictions >= 0.5).astype(int)
+        if(regression):
+            return predictions
+        else:    
+            return (predictions >= 0.5).astype(int)
     
     
 def calculate_accuracy(y_true, y_pred):
+    size = len(y_true[0])
     correct_predictions = np.sum(y_true == y_pred)
-    accuracy = correct_predictions / len(y_true) * 100
+    accuracy = correct_predictions / len(y_true) * 100 / size
     return accuracy
 
-def perform_tests(path):
-    layers = [2, 4, 4, 1]
-    activations = ["relu", "relu", "sigmoid"]  #"relu", "sigmoid" or "linear"
-    learning_rate = 0.05
+
+
+def perform_tests_simple(path):
+    #Accuracy for data.simple.test.100:  99.0 %
+    #Accuracy for data.simple.test.500:  99.4 %
+    #Accuracy for data.simple.test.1000:  99.6 %
+    #Accuracy for data.simple.test.10000:  99.64 %
+    layers = [2, 4, 2]
+    activations = ["linear","sigmoid"]  #"relu", "sigmoid" or "linear"
+    learning_rate = 0.001
     epochs = 10000
     seed = 42
     loss_function = "cross_entropy"  #"cross_entropy" or "mse"
@@ -155,8 +165,8 @@ def perform_tests(path):
         data = pd.read_csv(train_file_path, delimiter=',', header=0)
         data = data.sample(frac=1).reset_index(drop=True)
         X = data[['x', 'y']].to_numpy()
-        y = data['cls'].to_numpy().reshape(-1, 1)
-        y = np.where(y == 1, 0, 1)
+        cls = data['cls'].to_numpy() - 1 
+        y = np.eye(2)[cls]
 
         nn = Network(layers, activations, loss_function=loss_function, seed=seed)
         nn.train(X, y, epochs, learning_rate, False)
@@ -165,54 +175,138 @@ def perform_tests(path):
 
         data = pd.read_csv(test_file_path, delimiter=',', header=0)
         X = data[['x', 'y']].to_numpy()
-        y = data['cls'].to_numpy().reshape(-1, 1)
-        y = np.where(y == 1, 0, 1)
+        cls = data['cls'].to_numpy() - 1 
+        y = np.eye(2)[cls]
         predictions = nn.predict(X)
     
         print(f"Accuracy for data.simple.test.{num}: ", calculate_accuracy(y, predictions), "%")
 
     return
 
-
-
-if __name__ == "__main__":
-    #XOR problem
-    # X = np.array([[0, 0], [0, 1], [1, 0], [1, 1]])
-    # y = np.array([[0], [1], [1], [0]])
-
-    folder_path = 'C:/Users/patry/Downloads/projekt1/projekt1/classification/'
-
-    train_file_path = folder_path + f"data.simple.train.100.csv"
-    data = pd.read_csv(train_file_path, delimiter=',', header=0)
-    data = data.sample(frac=1).reset_index(drop=True)
-
-    X = data[['x', 'y']].to_numpy()
-    y = data['cls'].to_numpy().reshape(-1, 1)
-    y = np.where(y == 1, 0, 1)
-
-    #parameters
-    layers = [2, 4, 4, 1]
-    activations = ["relu", "relu", "sigmoid"]  #"relu", "sigmoid" or "linear"
-    learning_rate = 0.05
+def perform_tests_three_gauss(path):
+    #Accuracy for data.simple.test.100:  95.0 %
+    #Accuracy for data.simple.test.500:  94.91111111111111 %
+    #Accuracy for data.simple.test.1000:  94.93333333333334 %
+    #Accuracy for data.simple.test.10000:  94.92777777777779 %
+    layers = [2, 6, 3]
+    activations = ["linear", "sigmoid"]  #"relu", "sigmoid" or "linear"
+    learning_rate = 0.003
     epochs = 10000
     seed = 42
     loss_function = "cross_entropy"  #"cross_entropy" or "mse"
 
-    #initialize and train the network
-    nn = Network(layers, activations, loss_function=loss_function, seed=seed)
-    nn.train(X, y, epochs, learning_rate)
+    numbers = [100, 500, 1000, 10000]
+    for num in numbers:
+        train_file_path = path + f"data.three_gauss.train.{num}.csv"
 
-    #plot the error history
-    # nn.plot_error_history()
+        data = pd.read_csv(train_file_path, delimiter=',', header=0)
+        data = data.sample(frac=1).reset_index(drop=True)
+        X = data[['x', 'y']].to_numpy()
+        cls = data['cls'].to_numpy() - 1 
+        y = np.eye(3)[cls]
 
-    test_file_path = folder_path + f"data.simple.test.100.csv"
-    data = pd.read_csv(test_file_path, delimiter=',', header=0)
-    X = data[['x', 'y']].to_numpy()
-    y = data['cls'].to_numpy().reshape(-1, 1)
-    y = np.where(y == 1, 0, 1)
-    predictions = nn.predict(X)
+        nn = Network(layers, activations, loss_function=loss_function, seed=seed)
+        nn.train(X, y, epochs, learning_rate, False)
 
-    print("Accuracy: ", calculate_accuracy(y, predictions), "%")
+        test_file_path = path + f"data.three_gauss.train.{num}.csv"
+
+        data = pd.read_csv(test_file_path, delimiter=',', header=0)
+        X = data[['x', 'y']].to_numpy()
+        cls = data['cls'].to_numpy() - 1 
+        y = np.eye(3)[cls]
+        predictions = nn.predict(X)
+    
+        print(f"Accuracy for data.simple.test.{num}: ", calculate_accuracy(y, predictions), "%")
+
+    return
+
+def perform_tests_activation(path):
+    #Mean Squared Error for data.regression.test.100: 2104.4524425570726
+    #Mean Squared Error for data.regression.test.500: 2247.5073269826034
+    #Mean Squared Error for data.regression.test.1000: 2436.7308308206007
+    #Mean Squared Error for data.regression.test.10000: 2322.3700445755876
+    layers = [1, 1]  
+    activations = ["linear"] 
+    learning_rate = 0.0001
+    epochs = 10000
+    seed = 42
+    loss_function = "mse" 
+
+    numbers = [100, 500, 1000, 10000]  
+    for num in numbers:
+        train_file_path = path + f"data.activation.train.{num}.csv"
+        data = pd.read_csv(train_file_path, delimiter=',', header=0)
+        data = data.sample(frac=1).reset_index(drop=True)  
+
+        X = data[['x']].to_numpy() 
+        y = data[['y']].to_numpy() 
+
+        #standarization of data
+        mean_X = np.mean(X, axis=0)
+        std_X = np.std(X, axis=0)
+        X_standardized = (X - mean_X) / std_X
+        
+        mean_y = np.mean(y, axis=0)
+        std_y = np.std(y, axis=0)
+        y_standardized = (y - mean_y) / std_y
+
+        nn = Network(layers, activations, loss_function=loss_function, seed=seed)
+        nn.train(X_standardized, y_standardized, epochs, learning_rate, False)  
+
+        test_file_path = path + f"data.activation.test.{num}.csv"
+        data = pd.read_csv(test_file_path, delimiter=',', header=0)
+        X_test = data[['x']].to_numpy()  
+        y_test = data[['y']].to_numpy() 
+        X_test_standardized = (X_test - mean_X) / std_X
 
 
-    perform_tests(folder_path)
+        predictions_standardized = nn.predict(X_test_standardized, True)
+        predictions = predictions_standardized * std_y + mean_y
+
+        mse = mean_squared_error(y_test, predictions)
+        print(f"Mean Squared Error for data.regression.test.{num}: {mse}")
+
+    return
+
+
+if __name__ == "__main__":
+    
+
+#    train_file_path = folder_path + f"data.simple.train.1000.csv"
+#    data = pd.read_csv(train_file_path, delimiter=',', header=0)
+#    data = data.sample(frac=1).reset_index(drop=True)
+#
+#    X = data[['x', 'y']].to_numpy()
+#    cls = data['cls'].to_numpy() - 1 
+#    y = np.eye(2)[cls]
+#
+#    #parameters
+#    layers = [2, 4, 4, 2]
+#    activations = ["relu", "relu", "sigmoid"]  #"relu", "sigmoid" or "linear"
+#    learning_rate = 0.05
+#    epochs = 10000
+#    seed = 42
+#    loss_function = "cross_entropy"  #"cross_entropy" or "mse"
+#
+#    #initialize and train the network
+#    nn = Network(layers, activations, loss_function=loss_function, seed=seed)
+#    nn.train(X, y, epochs, learning_rate)
+#
+#    #plot the error history
+#    # nn.plot_error_history()
+#
+#    test_file_path = folder_path + f"data.simple.test.100.csv"
+#    data = pd.read_csv(test_file_path, delimiter=',', header=0)
+#    X = data[['x', 'y']].to_numpy()
+#    cls = data['cls'].to_numpy() - 1 
+#    y = np.eye(2)[cls]
+#    predictions = nn.predict(X)
+#
+#    print("Accuracy: ", calculate_accuracy(y, predictions), "%")
+
+    folder_path = 'S:/SN/projekt1/classification/'
+    #perform_tests_simple(folder_path)
+    #perform_tests_three_gauss(folder_path)
+    folder_path = 'S:/SN/projekt1/regression/'
+    perform_tests_activation(folder_path)
+
