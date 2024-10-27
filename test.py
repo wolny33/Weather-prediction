@@ -1,3 +1,5 @@
+import matplotlib
+import matplotlib.pyplot
 import numpy as np
 import pandas as pd
 import matplotlib.pyplot as plt
@@ -38,6 +40,8 @@ class Network:
             return np.maximum(0, z)
         elif activation == "linear":
             return z
+        elif activation == "cube":
+            return z**3
 
     #derivatives
     def apply_activation_derivative(self, a, activation):
@@ -47,6 +51,8 @@ class Network:
             return np.where(a > 0, 1, 0)
         elif activation == "linear":
             return 1
+        elif activation == "cube":
+            return 2*a**2
 
     #forward
     def forward(self, X):
@@ -202,7 +208,7 @@ def perform_tests_three_gauss(path):
         data = pd.read_csv(train_file_path, delimiter=',', header=0)
         data = data.sample(frac=1).reset_index(drop=True)
         X = data[['x', 'y']].to_numpy()
-        cls = data['cls'].to_numpy() - 1 
+        cls = data['cls'].to_numpy() - 1
         y = np.eye(3)[cls]
 
         nn = Network(layers, activations, loss_function=loss_function, seed=seed)
@@ -221,19 +227,20 @@ def perform_tests_three_gauss(path):
     return
 
 def perform_tests_activation(path):
-    #Mean Squared Error for data.regression.test.100: 2104.4524425570726
-    #Mean Squared Error for data.regression.test.500: 2247.5073269826034
-    #Mean Squared Error for data.regression.test.1000: 2436.7308308206007
-    #Mean Squared Error for data.regression.test.10000: 2322.3700445755876
-    layers = [1, 1]  
-    activations = ["linear"] 
-    learning_rate = 0.0001
+    #Mean Squared Error for data.regression.test.100: 0.06964267611614208
+    #Mean Squared Error for data.regression.test.500: 0.1099453715478068
+    #Mean Squared Error for data.regression.test.1000: 0.011450350054929089
+    #Mean Squared Error for data.regression.test.10000: 0.1541758763697975
+    layers = [1,4, 1]  
+    activations = ["sigmoid","linear"] 
+    #learning_rate = 0.01
     epochs = 10000
     seed = 42
     loss_function = "mse" 
 
     numbers = [100, 500, 1000, 10000]  
     for num in numbers:
+        learning_rate = 1.0/num
         train_file_path = path + f"data.activation.train.{num}.csv"
         data = pd.read_csv(train_file_path, delimiter=',', header=0)
         data = data.sample(frac=1).reset_index(drop=True)  
@@ -268,40 +275,94 @@ def perform_tests_activation(path):
 
     return
 
+def perform_tests_cube(path):
+    #Mean Squared Error for data.regression.test.100: 51015.399142573246
+    #Mean Squared Error for data.regression.test.500: 50003.65932079104
+    #Mean Squared Error for data.regression.test.1000: 52768.59193611867
+    #Mean Squared Error for data.regression.test.10000: 50443.42037943883
+    layers = [1,1,1]  
+    activations = ["cube","linear"] 
+    #learning_rate = 0.01
+    epochs = 10000
+    seed = 42
+    loss_function = "mse" 
+
+    numbers = [100, 500, 1000, 10000]  
+    for num in numbers:
+        learning_rate = 1.0/num
+        train_file_path = path + f"data.cube.train.{num}.csv"
+        data = pd.read_csv(train_file_path, delimiter=',', header=0)
+        data = data.sample(frac=1).reset_index(drop=True)
+
+        X = data[['x']].to_numpy() 
+        y = data[['y']].to_numpy() 
+
+        #standarization of data
+        mean_X = np.mean(X, axis=0)
+        std_X = np.std(X, axis=0)
+        X_standardized = (X - mean_X) / std_X
+        
+        mean_y = np.mean(y, axis=0)
+        std_y = np.std(y, axis=0)
+        y_standardized = (y - mean_y) / std_y
+
+        nn = Network(layers, activations, loss_function=loss_function, seed=seed)
+        nn.train(X_standardized, y_standardized, epochs, learning_rate, False)  
+
+        test_file_path = path + f"data.cube.test.{num}.csv"
+        data = pd.read_csv(test_file_path, delimiter=',', header=0)
+        X_test = data[['x']].to_numpy()  
+        y_test = data[['y']].to_numpy() 
+        X_test_standardized = (X_test - mean_X) / std_X
+
+
+        predictions_standardized = nn.predict(X_test_standardized, True)
+        predictions = predictions_standardized * std_y + mean_y
+
+        mse = mean_squared_error(y_test, predictions)
+        print(f"Mean Squared Error for data.regression.test.{num}: {mse}")
+
+    return
 
 if __name__ == "__main__":
     
+#Accuracy for data.simple.test.100:  99.0 %
+    #Accuracy for data.simple.test.500:  99.4 %
+    #Accuracy for data.simple.test.1000:  99.6 %
+    #Accuracy for data.simple.test.10000:  99.64 %
+    # path = 'S:/SN/projekt1/classification/'
+    # train_file_path = path + f"data.activation.train.{100}.csv"
+    # layers = [2, 4, 2]
+    # activations = ["linear","sigmoid"]  #"relu", "sigmoid" or "linear"
+    # learning_rate = 0.001
+    # epochs = 10000
+    # seed = 42
+    # loss_function = "cross_entropy"  #"cross_entropy" or "mse"
 
-#    train_file_path = folder_path + f"data.simple.train.1000.csv"
-#    data = pd.read_csv(train_file_path, delimiter=',', header=0)
-#    data = data.sample(frac=1).reset_index(drop=True)
-#
-#    X = data[['x', 'y']].to_numpy()
-#    cls = data['cls'].to_numpy() - 1 
-#    y = np.eye(2)[cls]
-#
-#    #parameters
-#    layers = [2, 4, 4, 2]
-#    activations = ["relu", "relu", "sigmoid"]  #"relu", "sigmoid" or "linear"
-#    learning_rate = 0.05
-#    epochs = 10000
-#    seed = 42
-#    loss_function = "cross_entropy"  #"cross_entropy" or "mse"
-#
-#    #initialize and train the network
-#    nn = Network(layers, activations, loss_function=loss_function, seed=seed)
-#    nn.train(X, y, epochs, learning_rate)
-#
-#    #plot the error history
-#    # nn.plot_error_history()
-#
-#    test_file_path = folder_path + f"data.simple.test.100.csv"
-#    data = pd.read_csv(test_file_path, delimiter=',', header=0)
-#    X = data[['x', 'y']].to_numpy()
-#    cls = data['cls'].to_numpy() - 1 
-#    y = np.eye(2)[cls]
-#    predictions = nn.predict(X)
-#
+    # numbers = [100]
+    # for num in numbers:
+
+    #     data = pd.read_csv(train_file_path, delimiter=',', header=0)
+    #     data = data.sample(frac=1).reset_index(drop=True)
+    #     X = data[['x', 'y']].to_numpy()
+    #     cls = data['cls'].to_numpy() - 1 
+    #     y = np.eye(2)[cls]
+
+    #     nn = Network(layers, activations, loss_function=loss_function, seed=seed)
+    #     nn.train(X, y, epochs, learning_rate, False)
+
+    #     test_file_path = path + f"data.simple.test.{num}.csv"
+
+    #     data = pd.read_csv(test_file_path, delimiter=',', header=0)
+    #     X = data[['x', 'y']].to_numpy()
+    #     cls = data['cls'].to_numpy() - 1 
+    #     y = np.eye(2)[cls]
+    #     predictions = nn.predict(X)
+    
+    #     print(f"Accuracy for data.simple.test.{num}: ", calculate_accuracy(y, predictions), "%")
+
+    # nn.plot_error_history()
+
 #    print("Accuracy: ", calculate_accuracy(y, predictions), "%")
 
     folder_path = 'S:/SN/projekt1/classification/'
@@ -309,4 +370,14 @@ if __name__ == "__main__":
     #perform_tests_three_gauss(folder_path)
     folder_path = 'S:/SN/projekt1/regression/'
     perform_tests_activation(folder_path)
+    #perform_tests_cube(folder_path)
 
+
+
+    # train_file_path = folder_path + f"data.activation.train.{100}.csv"
+    # data = pd.read_csv(train_file_path, delimiter=',', header=0)
+    # data = data.sample(frac=1).reset_index(drop=True)  
+    # X = data['x'] 
+    # y = data['y'] 
+    # matplotlib.pyplot.plot(X,y)
+    # matplotlib.pyplot.show()
