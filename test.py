@@ -24,7 +24,7 @@ class Network:
         self.activations = activations  
         self.loss_function = loss_function
 
-        #weights and biases
+        # Initialize weights and biases
         for i in range(self.num_layers - 1):
             limit = np.sqrt(6 / (layers[i] + layers[i + 1])) 
             self.weights.append(np.random.uniform(-limit, limit, (layers[i], layers[i + 1])))
@@ -41,17 +41,14 @@ class Network:
         elif activation == "linear":
             return z
         elif activation == "cube":
-            #print("Input to softmax (z):", z)
-            #print("Max value in z:", np.max(z))
-            #print("Min value in z:", np.min(z))
             return z**3
         elif activation == "softmax":
             #print("Input to softmax (z):", z)
             #print("Max value in z:", np.max(z))
             #print("Min value in z:", np.min(z))
-            z_stable = z - np.max(z)
+            z_stable = z - np.max(z, axis=1, keepdims=True)
             exps = np.exp(z_stable)
-            return exps / (np.sum(exps) + 1e-9)
+            return exps / (np.sum(exps, axis=1, keepdims=True) + 1e-9)
 
     def apply_activation_derivative(self, a, activation):
         if activation == "sigmoid":
@@ -149,12 +146,13 @@ class Network:
             return predictions
         else:    
             predictions = self.forward(X)
-            return np.argmax(predictions)
+            return np.argmax(predictions, axis=1)
+
 
     
     
 def calculate_accuracy(y_true, y_pred):
-    y_true_labels = np.argmax(y_true)
+    y_true_labels = np.argmax(y_true, axis=1)
     #print(y_true_labels)
     #print(y_pred)
     correct_predictions = np.sum(y_true_labels == y_pred)
@@ -169,8 +167,8 @@ def perform_tests_simple(path):
     #Accuracy for data.simple.test.1000:  99.6 %
     #Accuracy for data.simple.test.10000:  99.64 %
     layers = [2, 4, 2]
-    activations = ["linear","sigmoid"]  #"relu", "sigmoid" or "linear"
-    learning_rate = 0.001
+    activations = ["linear","softmax"]  #"relu", "sigmoid" or "linear","softmax"
+    learning_rate = 0.0001
     epochs = 10000
     seed = 42
     loss_function = "cross_entropy"  #"cross_entropy" or "mse"
@@ -201,7 +199,7 @@ def perform_tests_simple(path):
     return
 
 def perform_tests_three_gauss(path):
-    layers = [2, 8,  3]
+    layers = [2, 4, 3]
     activations = ["linear", "softmax"]
     learning_rate = 0.0001
     epochs = 10000
@@ -229,7 +227,7 @@ def perform_tests_three_gauss(path):
         
         predictions = nn.predict(X)
         print(f"Accuracy for data.three_gauss.test.{num}: ", calculate_accuracy(y, predictions), "%")
-        #nn.plot_error_history()
+        nn.plot_error_history()
     return
 
 def perform_tests_activation(path):
@@ -255,12 +253,12 @@ def perform_tests_activation(path):
         y = data[['y']].to_numpy() 
 
         #standarization of data
-        mean_X = np.mean(X)
-        std_X = np.std(X)
+        mean_X = np.mean(X, axis=0)
+        std_X = np.std(X, axis=0)
         X_standardized = (X - mean_X) / std_X
         
-        mean_y = np.mean(y)
-        std_y = np.std(y)
+        mean_y = np.mean(y, axis=0)
+        std_y = np.std(y, axis=0)
         y_standardized = (y - mean_y) / std_y
 
         nn = Network(layers, activations, loss_function=loss_function, seed=seed)
@@ -286,8 +284,8 @@ def perform_tests_cube(path):
     #Mean Squared Error for data.regression.test.500: 50003.65932079104
     #Mean Squared Error for data.regression.test.1000: 52768.59193611867
     #Mean Squared Error for data.regression.test.10000: 50443.42037943883
-    layers = [1,4,1]  
-    activations = ["sigmoid","linear"] 
+    layers = [1,1,1]  
+    activations = ["cube","linear"] 
     #learning_rate = 0.01
     epochs = 10000
     seed = 42
@@ -304,12 +302,12 @@ def perform_tests_cube(path):
         y = data[['y']].to_numpy() 
 
         #standarization of data
-        mean_X = np.mean(X)
-        std_X = np.std(X)
+        mean_X = np.mean(X, axis=0)
+        std_X = np.std(X, axis=0)
         X_standardized = (X - mean_X) / std_X
         
-        mean_y = np.mean(y)
-        std_y = np.std(y)
+        mean_y = np.mean(y, axis=0)
+        std_y = np.std(y, axis=0)
         y_standardized = (y - mean_y) / std_y
 
         nn = Network(layers, activations, loss_function=loss_function, seed=seed)
@@ -327,7 +325,6 @@ def perform_tests_cube(path):
 
         mse = mean_squared_error(y_test, predictions)
         print(f"Mean Squared Error for data.regression.test.{num}: {mse}")
-        nn.plot_error_history()
 
     return
 
@@ -373,11 +370,11 @@ if __name__ == "__main__":
 #    print("Accuracy: ", calculate_accuracy(y, predictions), "%")
 
     folder_path = 'S:/SN/projekt1/classification/'
-    #perform_tests_simple(folder_path)
+    perform_tests_simple(folder_path)
     #perform_tests_three_gauss(folder_path)
     folder_path = 'S:/SN/projekt1/regression/'
     #perform_tests_activation(folder_path)
-    perform_tests_cube(folder_path)
+    #perform_tests_cube(folder_path)
 
 
 
