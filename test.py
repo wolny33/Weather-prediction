@@ -8,8 +8,8 @@ from scipy.special import expit
 #loss functions
 def cross_entropy_loss(y_true, y_pred):
     samples_amount = y_true.shape[0]
-    #y_pred_clipped = np.clip(y_pred, 1e-9, 1 - 1e-9)
-    return -np.sum(y_true * np.log(y_pred)) / samples_amount
+    y_pred_clipped = np.clip(y_pred, 1e-9, 1 - 1e-9)
+    return -np.sum(y_true * np.log(y_pred_clipped)) / samples_amount
 
 def mean_squared_error(y_true, y_pred):
     return np.mean((y_true - y_pred) ** 2)
@@ -17,23 +17,23 @@ def mean_squared_error(y_true, y_pred):
 class Network:
     def __init__(self, layers, activations, loss_function="mse", seed=None):
         if seed:
-            np.random.seed(seed)  
+            np.random.seed(seed)
         
         self.num_layers = len(layers)
         self.weights = []
         self.biases = []
         self.activations = activations  
         self.loss_function = loss_function
-        
-        #create weights and biases
+
+        # Initialize weights and biases
         for i in range(self.num_layers - 1):
-            self.weights.append(np.random.randn(layers[i], layers[i + 1]))
+            limit = np.sqrt(6 / (layers[i] + layers[i + 1])) 
+            self.weights.append(np.random.uniform(-limit, limit, (layers[i], layers[i + 1])))
             self.biases.append(np.zeros((1, layers[i + 1])))
 
         self.weight_error_history = []
         self.bias_error_history = []
 
-    #activation functions
     def apply_activation(self, z, activation):
         if activation == "sigmoid":
             # return 1 / (1 + np.exp(-z))
@@ -44,8 +44,14 @@ class Network:
             return z
         elif activation == "cube":
             return z**3
+        elif activation == "softmax":
+            #print("Input to softmax (z):", z)
+            #print("Max value in z:", np.max(z))
+            #print("Min value in z:", np.min(z))
+            z_stable = z - np.max(z, axis=1, keepdims=True)
+            exps = np.exp(z_stable)
+            return exps / (np.sum(exps, axis=1, keepdims=True) + 1e-9)
 
-    #derivatives
     def apply_activation_derivative(self, a, activation):
         if activation == "sigmoid":
             return a * (1 - a)
@@ -54,27 +60,28 @@ class Network:
         elif activation == "linear":
             return 1
         elif activation == "cube":
-            return 2*a**2
+            return 2 * a ** 2
 
-    #forward
+
     def forward(self, X):
         self.activations_values = [X]
         self.z_values = []
-        
+
         for i in range(self.num_layers - 1):
             z = np.dot(self.activations_values[-1], self.weights[i]) + self.biases[i]
             self.z_values.append(z)
             a = self.apply_activation(z, self.activations[i])
             self.activations_values.append(a)
-        
         return self.activations_values[-1]
 
-    #backward
     def backward(self, X, y, output, learning_rate):
         deltas = []
 
-        output_error = y - output  
-        output_delta = output_error * self.apply_activation_derivative(output, self.activations[-1])
+        if self.activations[-1] == "softmax" and self.loss_function == "cross_entropy":
+            output_delta =  y - output
+        else:
+            output_error = y - output
+            output_delta = output_error * self.apply_activation_derivative(output, self.activations[-1])
 
         deltas.append(output_delta)
         
@@ -97,15 +104,13 @@ class Network:
             #save the errors
             self.weight_error_history.append(np.linalg.norm(weight_update))
             self.bias_error_history.append(np.linalg.norm(bias_update))
-    
+
+
     def train(self, X, y, epochs, learning_rate, print_loss=True):
         for epoch in range(epochs):
-
             output = self.forward(X)
-            
             self.backward(X, y, output, learning_rate)
             
-            #loss at every 1000 epochs
             if epoch % 1000 == 0 and print_loss:
                 if self.loss_function == "cross_entropy":
                     loss = cross_entropy_loss(y, output)
@@ -113,7 +118,6 @@ class Network:
                     loss = mean_squared_error(y, output)
                 print(f'Epoch {epoch}, Loss: {loss}')
 
-    # Function to plot weight and bias error history
     def plot_error_history(self):
         weight_error_history = np.array(self.weight_error_history)
         bias_error_history = np.array(self.bias_error_history)
@@ -146,19 +150,26 @@ class Network:
         #     print(predictions)
         #     print((predictions >= 0.5).astype(int))
         #     return (predictions >= 0.5).astype(int)
-        else:
-            print(predictions)
-            max_indices = np.argmax(predictions, axis=1)
-            one_hot_predictions = np.zeros_like(predictions)
-            one_hot_predictions[np.arange(predictions.shape[0]), max_indices] = 1
-            print(one_hot_predictions)
-            return one_hot_predictions
+        # else:
+        #     print(predictions)
+        #     max_indices = np.argmax(predictions, axis=1)
+        #     one_hot_predictions = np.zeros_like(predictions)
+        #     one_hot_predictions[np.arange(predictions.shape[0]), max_indices] = 1
+        #     print(one_hot_predictions)
+        #     return one_hot_predictions
+        else:    
+            predictions = self.forward(X)
+            return np.argmax(predictions, axis=1)
+
+
     
     
 def calculate_accuracy(y_true, y_pred):
-    size = len(y_true[0])
-    correct_predictions = np.sum(y_true == y_pred)
-    accuracy = correct_predictions / len(y_true) * 100 / size
+    y_true_labels = np.argmax(y_true, axis=1)
+    #print(y_true_labels)
+    #print(y_pred)
+    correct_predictions = np.sum(y_true_labels == y_pred)
+    accuracy = (correct_predictions / len(y_true)) * 100
     return accuracy
 
 
@@ -169,9 +180,9 @@ def perform_tests_simple(path, print_results=False):
     #Accuracy for data.simple.test.1000:  99.6 %
     #Accuracy for data.simple.test.10000:  99.64 %
     layers = [2, 4, 2]
-    activations = ["linear","sigmoid"]  #"relu", "sigmoid" or "linear"
-    learning_rate = 0.001
-    epochs = 500
+    activations = ["linear","softmax"]  #"relu", "sigmoid" or "linear","softmax"
+    learning_rate = 0.0001
+    epochs = 10000
     seed = np.random.randint(1, 100)
     print('seed', seed)
     loss_function = "cross_entropy"  #"cross_entropy" or "mse"
@@ -204,17 +215,13 @@ def perform_tests_simple(path, print_results=False):
     return sum(accuracy) / len(accuracy)
 
 def perform_tests_three_gauss(path, print_results=False):
-    #Accuracy for data.simple.test.100:  95.0 %
-    #Accuracy for data.simple.test.500:  94.91111111111111 %
-    #Accuracy for data.simple.test.1000:  94.93333333333334 %
-    #Accuracy for data.simple.test.10000:  94.92777777777779 %
-    layers = [2, 4, 6, 3]
-    activations = ["linear", "relu", "sigmoid"]  #"relu", "sigmoid" or "linear"
-    learning_rate = 0.001
+    layers = [2, 4, 3]
+    activations = ["linear", "softmax"]
+    learning_rate = 0.0001
     epochs = 10000
-    seed = 61
+    seed = 41
     print('seed', seed)
-    loss_function = "cross_entropy"  #"cross_entropy" or "mse"
+    loss_function = "cross_entropy"
 
     # numbers = [100, 500, 1000, 10000]
     accuracy = list()
@@ -231,12 +238,12 @@ def perform_tests_three_gauss(path, print_results=False):
         nn = Network(layers, activations, loss_function=loss_function, seed=seed)
         nn.train(X, y, epochs, learning_rate, False)
 
-        test_file_path = path + f"data.three_gauss.train.{num}.csv"
-
+        test_file_path = path + f"data.three_gauss.test.{num}.csv"
         data = pd.read_csv(test_file_path, delimiter=',', header=0)
         X = data[['x', 'y']].to_numpy()
         cls = data['cls'].to_numpy() - 1 
         y = np.eye(3)[cls]
+        
         predictions = nn.predict(X)
         accuracy.append(calculate_accuracy(y, predictions))
         if print_results:
