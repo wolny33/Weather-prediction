@@ -3,6 +3,7 @@ import matplotlib.pyplot
 import numpy as np
 import pandas as pd
 import matplotlib.pyplot as plt
+from scipy.special import expit
 
 #loss functions
 def cross_entropy_loss(y_true, y_pred):
@@ -24,7 +25,7 @@ class Network:
         self.activations = activations  
         self.loss_function = loss_function
         
-        #reate weights and biases
+        #create weights and biases
         for i in range(self.num_layers - 1):
             self.weights.append(np.random.randn(layers[i], layers[i + 1]))
             self.biases.append(np.zeros((1, layers[i + 1])))
@@ -35,7 +36,8 @@ class Network:
     #activation functions
     def apply_activation(self, z, activation):
         if activation == "sigmoid":
-            return 1 / (1 + np.exp(-z))
+            # return 1 / (1 + np.exp(-z))
+            return expit(z)
         elif activation == "relu":
             return np.maximum(0, z)
         elif activation == "linear":
@@ -140,8 +142,17 @@ class Network:
         predictions = self.forward(X)
         if(regression):
             return predictions
-        else:    
-            return (predictions >= 0.5).astype(int)
+        # else:
+        #     print(predictions)
+        #     print((predictions >= 0.5).astype(int))
+        #     return (predictions >= 0.5).astype(int)
+        else:
+            print(predictions)
+            max_indices = np.argmax(predictions, axis=1)
+            one_hot_predictions = np.zeros_like(predictions)
+            one_hot_predictions[np.arange(predictions.shape[0]), max_indices] = 1
+            print(one_hot_predictions)
+            return one_hot_predictions
     
     
 def calculate_accuracy(y_true, y_pred):
@@ -152,7 +163,7 @@ def calculate_accuracy(y_true, y_pred):
 
 
 
-def perform_tests_simple(path):
+def perform_tests_simple(path, print_results=False):
     #Accuracy for data.simple.test.100:  99.0 %
     #Accuracy for data.simple.test.500:  99.4 %
     #Accuracy for data.simple.test.1000:  99.6 %
@@ -160,11 +171,13 @@ def perform_tests_simple(path):
     layers = [2, 4, 2]
     activations = ["linear","sigmoid"]  #"relu", "sigmoid" or "linear"
     learning_rate = 0.001
-    epochs = 10000
-    seed = 42
+    epochs = 500
+    seed = np.random.randint(1, 100)
+    print('seed', seed)
     loss_function = "cross_entropy"  #"cross_entropy" or "mse"
 
     numbers = [100, 500, 1000, 10000]
+    accuracy = list()
     for num in numbers:
         train_file_path = path + f"data.simple.train.{num}.csv"
 
@@ -184,29 +197,33 @@ def perform_tests_simple(path):
         cls = data['cls'].to_numpy() - 1 
         y = np.eye(2)[cls]
         predictions = nn.predict(X)
-    
-        print(f"Accuracy for data.simple.test.{num}: ", calculate_accuracy(y, predictions), "%")
+        accuracy.append(calculate_accuracy(y, predictions))
+        if print_results:
+            print(f"Accuracy for data.simple.test.{num}: ", calculate_accuracy(y, predictions), "%")
 
-    return
+    return sum(accuracy) / len(accuracy)
 
-def perform_tests_three_gauss(path):
+def perform_tests_three_gauss(path, print_results=False):
     #Accuracy for data.simple.test.100:  95.0 %
     #Accuracy for data.simple.test.500:  94.91111111111111 %
     #Accuracy for data.simple.test.1000:  94.93333333333334 %
     #Accuracy for data.simple.test.10000:  94.92777777777779 %
-    layers = [2, 6, 3]
-    activations = ["linear", "sigmoid"]  #"relu", "sigmoid" or "linear"
-    learning_rate = 0.003
+    layers = [2, 4, 6, 3]
+    activations = ["linear", "relu", "sigmoid"]  #"relu", "sigmoid" or "linear"
+    learning_rate = 0.001
     epochs = 10000
-    seed = 42
+    seed = 61
+    print('seed', seed)
     loss_function = "cross_entropy"  #"cross_entropy" or "mse"
 
-    numbers = [100, 500, 1000, 10000]
+    # numbers = [100, 500, 1000, 10000]
+    accuracy = list()
+    numbers = [10000]
     for num in numbers:
         train_file_path = path + f"data.three_gauss.train.{num}.csv"
 
         data = pd.read_csv(train_file_path, delimiter=',', header=0)
-        data = data.sample(frac=1).reset_index(drop=True)
+        # data = data.sample(frac=1).reset_index(drop=True)
         X = data[['x', 'y']].to_numpy()
         cls = data['cls'].to_numpy() - 1
         y = np.eye(3)[cls]
@@ -221,21 +238,23 @@ def perform_tests_three_gauss(path):
         cls = data['cls'].to_numpy() - 1 
         y = np.eye(3)[cls]
         predictions = nn.predict(X)
-    
-        print(f"Accuracy for data.simple.test.{num}: ", calculate_accuracy(y, predictions), "%")
+        accuracy.append(calculate_accuracy(y, predictions))
+        if print_results:
+            print(f"Accuracy for data.simple.test.{num}: ", calculate_accuracy(y, predictions), "%")
 
-    return
+    return sum(accuracy) / len(accuracy)
 
-def perform_tests_activation(path):
+def perform_tests_activation(path, print_results=False):
     #Mean Squared Error for data.regression.test.100: 0.06964267611614208
     #Mean Squared Error for data.regression.test.500: 0.1099453715478068
     #Mean Squared Error for data.regression.test.1000: 0.011450350054929089
     #Mean Squared Error for data.regression.test.10000: 0.1541758763697975
-    layers = [1,4, 1]  
-    activations = ["sigmoid","linear"] 
+    layers = [1, 4, 4, 1]  
+    activations = ["sigmoid", "sigmoid", "linear"] 
     #learning_rate = 0.01
     epochs = 10000
-    seed = 42
+    seed = np.random.randint(1, 100)
+    print('seed', seed)
     loss_function = "mse" 
 
     numbers = [100, 500, 1000, 10000]  
@@ -271,11 +290,12 @@ def perform_tests_activation(path):
         predictions = predictions_standardized * std_y + mean_y
 
         mse = mean_squared_error(y_test, predictions)
-        print(f"Mean Squared Error for data.regression.test.{num}: {mse}")
+        if print_results:
+            print(f"Mean Squared Error for data.regression.test.{num}: {mse}")
 
-    return
+    return mse
 
-def perform_tests_cube(path):
+def perform_tests_cube(path, print_results=False):
     #Mean Squared Error for data.regression.test.100: 51015.399142573246
     #Mean Squared Error for data.regression.test.500: 50003.65932079104
     #Mean Squared Error for data.regression.test.1000: 52768.59193611867
@@ -320,9 +340,10 @@ def perform_tests_cube(path):
         predictions = predictions_standardized * std_y + mean_y
 
         mse = mean_squared_error(y_test, predictions)
-        print(f"Mean Squared Error for data.regression.test.{num}: {mse}")
+        if print_results:
+            print(f"Mean Squared Error for data.regression.test.{num}: {mse}")
 
-    return
+    return mse
 
 if __name__ == "__main__":
     
@@ -365,12 +386,31 @@ if __name__ == "__main__":
 
 #    print("Accuracy: ", calculate_accuracy(y, predictions), "%")
 
-    folder_path = 'S:/SN/projekt1/classification/'
-    #perform_tests_simple(folder_path)
-    #perform_tests_three_gauss(folder_path)
-    folder_path = 'S:/SN/projekt1/regression/'
-    perform_tests_activation(folder_path)
-    #perform_tests_cube(folder_path)
+    folder_path = 'C:/Users/patry/Downloads/projekt1/projekt1/classification/'
+    # accuracy = list()
+    # for i in range(10):
+    #     accuracy.append(perform_tests_simple(folder_path, True))
+    # print('Wynik:')
+    # print(sum(accuracy)/len(accuracy))
+    # accuracy = list()
+    # for i in range(1):
+    #     accuracy.append(perform_tests_three_gauss(folder_path, True))
+    # print('Wynik:')
+    # print(sum(accuracy)/len(accuracy))
+        
+    folder_path = 'C:/Users/patry/Downloads/projekt1/projekt1/regression/'
+    # accuracy = list()
+    # for i in range(10):
+    #     accuracy.append(perform_tests_activation(folder_path, True))
+    # print('Wynik:')
+    # print(sum(accuracy)/len(accuracy))
+
+    
+    accuracy = list()
+    for i in range(1):
+        accuracy.append(perform_tests_cube(folder_path, True))
+    print('Wynik:')
+    print(sum(accuracy)/len(accuracy))
 
 
 
