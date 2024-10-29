@@ -490,10 +490,70 @@ def regression_tests(folder_path):
 
     return
 
+def load_mnist_images(file_path):
+    with open(file_path, 'rb') as f:
+        magic, num_images, rows, cols = np.fromfile(f, dtype='>i4', count=4)
+        images = np.fromfile(f, dtype=np.uint8).reshape(num_images, rows, cols)
+    return images
+
+def load_mnist_labels(file_path):
+    with open(file_path, 'rb') as f:
+        magic, num_labels = np.fromfile(f, dtype='>i4', count=2)
+        labels = np.fromfile(f, dtype=np.uint8)
+    return labels
+
+def MNIST_tests(folder_path, random_seed=False):
+    layers = [28*28, 256, 128, 10]  
+    activations = ["linear", "sigmoid", "sigmoid"] 
+    learning_rate = 0.00001
+    epochs = 1000
+    if random_seed:
+        seed = np.random.randint(1, 100)
+    else:
+        seed = 64 # 91.56%
+    print('seed', seed)
+    loss_function = "cross_entropy" 
+    
+    images_path = folder_path + 'train-images.idx3-ubyte'
+    labels_path = folder_path + 'train-labels.idx1-ubyte'
+
+    images = load_mnist_images(images_path)
+    labels = load_mnist_labels(labels_path)
+
+    images = images / 255.0
+    # print(images)
+    # print(f"Loaded {images.shape[0]} images with shape {images.shape[1:]} and {len(labels)} labels.")
+
+    X_train = images[:60000].reshape(-1, 28 * 28)
+    y_train = np.eye(10)[labels[:60000]]
+    
+    nn = Network(layers, activations, loss_function=loss_function, seed=seed)
+    nn.train(X_train, y_train, epochs, learning_rate, True)  
+
+    images_path = folder_path + 't10k-images.idx3-ubyte'
+    labels_path = folder_path + 't10k-labels.idx1-ubyte'
+    images = load_mnist_images(images_path)
+    labels = load_mnist_labels(labels_path)
+
+    X_test = images.reshape(-1, 28 * 28)
+    y_test = np.eye(10)[labels]
+    predictions = nn.predict(X_test)
+    accuracy = calculate_accuracy(y_test, predictions)
+    
+    print(f"Accuracy on MNIST test set: {accuracy}%")
+
+    # nn.plot_error_history()
+
+    return accuracy
+
 if __name__ == "__main__":
     
-    folder_path = 'C:/Users/patry/Downloads/projekt1/projekt1/classification/'
-    classification_tests(folder_path)
+    # folder_path = 'C:/Users/patry/Downloads/projekt1/projekt1/classification/'
+    # classification_tests(folder_path)
         
-    folder_path = 'C:/Users/patry/Downloads/projekt1/projekt1/regression/'
-    regression_tests(folder_path)
+    # folder_path = 'C:/Users/patry/Downloads/projekt1/projekt1/regression/'
+    # regression_tests(folder_path)
+
+    folder_path = 'C:/Users/patry/Downloads/MNIST/'
+    MNIST_tests(folder_path)
+
