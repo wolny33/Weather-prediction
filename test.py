@@ -251,7 +251,7 @@ def perform_tests_three_gauss(path, random_seed=False, print_results=False, plot
     if random_seed:
         seed = np.random.randint(1, 100)
     else:
-        seed = 41
+        seed = 42
     print('seed', seed)
     loss_function = "cross_entropy"
 
@@ -462,7 +462,7 @@ def classification_tests(folder_path):
     iterations = 1
     accuracy = list()
     for i in range(iterations):
-        accuracy.append(perform_tests_simple(folder_path, False, True, True))
+        accuracy.append(perform_tests_simple(folder_path, False, True, False))
     print('Wynik:')
     print(sum(accuracy)/len(accuracy))
 
@@ -478,7 +478,7 @@ def regression_tests(folder_path):
     iterations = 1
     accuracy = list()
     for i in range(iterations):
-        accuracy.append(perform_tests_activation(folder_path, False, True, True))
+        accuracy.append(perform_tests_activation(folder_path, False, True, False))
     print('Wynik:')
     print(sum(accuracy)/len(accuracy))
 
