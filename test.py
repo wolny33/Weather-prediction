@@ -74,7 +74,7 @@ class Network:
             self.activations_values.append(cp.array(a, dtype=cp.float32))
         return self.activations_values[-1]
 
-    def backward(self, X, y, output, learning_rate):
+    def backward(self, X, y, output, learning_rate, save_history):
         deltas = []
 
         if self.activations[-1] == "softmax" and self.loss_function == "cross_entropy":
@@ -102,42 +102,30 @@ class Network:
             self.weights[i] += weight_update
             self.biases[i] += bias_update
             
-            # save the errors
-            # self.weight_error_history.append(cp.linalg.norm(weight_update))
-            # self.bias_error_history.append(cp.linalg.norm(bias_update))
+            if save_history:
+                # save the errors
+                self.weight_error_history.append(cp.linalg.norm(weight_update))
+                self.bias_error_history.append(cp.linalg.norm(bias_update))
+        if save_history:
+            self.weight_values_history.append([w.copy() for w in self.weights])
 
-        # self.weight_values_history.append([w.copy() for w in self.weights])
-
-    # def train(self, X, y, epochs, learning_rate, print_loss=True):
-    #     X = cp.array(X) 
-    #     y = cp.array(y)
-    #     for epoch in range(epochs):
-    #         output = self.forward(X)
-    #         self.backward(X, y, output, learning_rate)
-            
-    #         if epoch % 1000 == 0 and print_loss:
-    #             if self.loss_function == "cross_entropy":
-    #                 loss = cross_entropy_loss(y, output)
-    #             else:
-    #                 loss = mean_squared_error(y, output)
-    #             print(f'Epoch {epoch}, Loss: {loss}')
-    def train(self, X, y, epochs, learning_rate, batch_size=2048, print_loss=True): 
-        X = cp.array(X, dtype=cp.float32) 
-        y = cp.array(y, dtype=cp.float32) 
+    def train(self, X, y, epochs, learning_rate, print_loss=True, save_history=True, batch_size=2048): 
+        X = cp.array(X, dtype=cp.float32)
+        y = cp.array(y, dtype=cp.float32)
         num_samples = X.shape[0] 
         for epoch in range(epochs): 
             permutation = cp.random.permutation(num_samples) 
             X_shuffled = X[permutation] 
             y_shuffled = y[permutation]
             for i in range(0, num_samples, batch_size): 
-                X_batch = X_shuffled[i:i + batch_size] 
+                X_batch = X_shuffled[i:i + batch_size]
                 y_batch = y_shuffled[i:i + batch_size] 
                 output = self.forward(X_batch)
-                self.backward(X_batch, y_batch, output, learning_rate)
+                self.backward(X_batch, y_batch, output, learning_rate, save_history)
 
                 cp.cuda.Stream.null.synchronize() 
                 cp.get_default_memory_pool().free_all_blocks()
-            # print("Epoch: ", epoch)
+                
             if epoch % 1000 == 0 and print_loss: 
                 if self.loss_function == "cross_entropy": 
                     loss = cross_entropy_loss(y, self.forward(X)) 
@@ -523,13 +511,13 @@ def regression_tests(folder_path):
 
 def load_mnist_images(file_path):
     with open(file_path, 'rb') as f:
-        magic, num_images, rows, cols = np.fromfile(f, dtype='>i4', count=4)
+        _, num_images, rows, cols = np.fromfile(f, dtype='>i4', count=4)
         images = np.fromfile(f, dtype=np.uint8).reshape(num_images, rows, cols)
     return images
 
 def load_mnist_labels(file_path):
     with open(file_path, 'rb') as f:
-        magic, num_labels = np.fromfile(f, dtype='>i4', count=2)
+        _ = np.fromfile(f, dtype='>i4', count=2)
         labels = np.fromfile(f, dtype=np.uint8)
     return labels
 
@@ -541,8 +529,8 @@ def MNIST_tests(folder_path, random_seed=False):
     if random_seed:
         seed = cp.random.randint(1, 100)
     else:
-        seed = 86 # 97.2%
-    print('seed', seed)
+        seed = 86 # 97.2% - 10k epochs
+
     loss_function = "cross_entropy" 
     
     images_path = folder_path + 'train-images.idx3-ubyte'
@@ -552,14 +540,12 @@ def MNIST_tests(folder_path, random_seed=False):
     labels = load_mnist_labels(labels_path)
 
     images = images / 255.0
-    # print(images)
-    # print(f"Loaded {images.shape[0]} images with shape {images.shape[1:]} and {len(labels)} labels.")
 
-    X_train = images[:60000].reshape(-1, 28 * 28)
-    y_train = cp.eye(10)[labels[:60000]]
+    X_train = images.reshape(-1, 28 * 28)
+    y_train = cp.eye(10)[labels]
     
     nn = Network(layers, activations, loss_function=loss_function, seed=seed)
-    nn.train(X_train, y_train, epochs, learning_rate, print_loss=True)  
+    nn.train(X_train, y_train, epochs, learning_rate, True, False)  
 
     images_path = folder_path + 't10k-images.idx3-ubyte'
     labels_path = folder_path + 't10k-labels.idx1-ubyte'
@@ -573,12 +559,10 @@ def MNIST_tests(folder_path, random_seed=False):
     
     print(f"Accuracy on MNIST test set: {accuracy}%")
 
-    # nn.plot_error_history()
-
     return accuracy
 
 if __name__ == "__main__":
-    
+
     # folder_path = 'C:/Users/patry/Downloads/projekt1/projekt1/classification/'
     # classification_tests(folder_path)
         
@@ -586,6 +570,5 @@ if __name__ == "__main__":
     # regression_tests(folder_path)
 
     folder_path = 'C:/Users/patry/Downloads/MNIST/'
-    for i in range(1):
-        MNIST_tests(folder_path, False)
+    MNIST_tests(folder_path, False) # 97.2% - 10k epochs
 
