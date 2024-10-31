@@ -52,7 +52,6 @@ class Network:
             return exps / (cp.sum(exps, axis=1, keepdims=True) + 1e-9)
 
     def apply_activation_derivative(self, a, activation):
-        # a = cp.array(a)
         if activation == "sigmoid":
             return a * (1 - a)
         elif activation == "relu":
@@ -104,10 +103,10 @@ class Network:
             self.biases[i] += bias_update
             
             # save the errors
-            self.weight_error_history.append(cp.linalg.norm(weight_update))
-            self.bias_error_history.append(cp.linalg.norm(bias_update))
+            # self.weight_error_history.append(cp.linalg.norm(weight_update))
+            # self.bias_error_history.append(cp.linalg.norm(bias_update))
 
-        self.weight_values_history.append([w.copy() for w in self.weights])
+        # self.weight_values_history.append([w.copy() for w in self.weights])
 
     # def train(self, X, y, epochs, learning_rate, print_loss=True):
     #     X = cp.array(X) 
@@ -122,14 +121,14 @@ class Network:
     #             else:
     #                 loss = mean_squared_error(y, output)
     #             print(f'Epoch {epoch}, Loss: {loss}')
-    def train(self, X, y, epochs, learning_rate, batch_size=16, print_loss=True): 
+    def train(self, X, y, epochs, learning_rate, batch_size=2048, print_loss=True): 
         X = cp.array(X, dtype=cp.float32) 
         y = cp.array(y, dtype=cp.float32) 
         num_samples = X.shape[0] 
         for epoch in range(epochs): 
             permutation = cp.random.permutation(num_samples) 
             X_shuffled = X[permutation] 
-            y_shuffled = y[permutation] 
+            y_shuffled = y[permutation]
             for i in range(0, num_samples, batch_size): 
                 X_batch = X_shuffled[i:i + batch_size] 
                 y_batch = y_shuffled[i:i + batch_size] 
@@ -138,7 +137,7 @@ class Network:
 
                 cp.cuda.Stream.null.synchronize() 
                 cp.get_default_memory_pool().free_all_blocks()
-
+            # print("Epoch: ", epoch)
             if epoch % 1000 == 0 and print_loss: 
                 if self.loss_function == "cross_entropy": 
                     loss = cross_entropy_loss(y, self.forward(X)) 
@@ -535,14 +534,14 @@ def load_mnist_labels(file_path):
     return labels
 
 def MNIST_tests(folder_path, random_seed=False):
-    layers = [28*28, 256, 256, 10]  
-    activations = ["linear", "sigmoid", "sigmoid"] 
+    layers = [28*28, 512, 512, 256, 10]  
+    activations = ["linear", "linear", "sigmoid", "softmax"] 
     learning_rate = 0.00001
-    epochs = 1500
+    epochs = 10000
     if random_seed:
         seed = cp.random.randint(1, 100)
     else:
-        seed = 86 # 92.31%
+        seed = 86 # 97.2%
     print('seed', seed)
     loss_function = "cross_entropy" 
     
@@ -560,7 +559,7 @@ def MNIST_tests(folder_path, random_seed=False):
     y_train = cp.eye(10)[labels[:60000]]
     
     nn = Network(layers, activations, loss_function=loss_function, seed=seed)
-    nn.train(X_train, y_train, epochs, learning_rate, True)  
+    nn.train(X_train, y_train, epochs, learning_rate, print_loss=True)  
 
     images_path = folder_path + 't10k-images.idx3-ubyte'
     labels_path = folder_path + 't10k-labels.idx1-ubyte'
@@ -587,6 +586,6 @@ if __name__ == "__main__":
     # regression_tests(folder_path)
 
     folder_path = 'C:/Users/patry/Downloads/MNIST/'
-    for i in range(5):
-        MNIST_tests(folder_path, True)
+    for i in range(1):
+        MNIST_tests(folder_path, False)
 
