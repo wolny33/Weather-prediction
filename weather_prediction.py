@@ -4,7 +4,9 @@ from sklearn.metrics import roc_auc_score
 
 class WeatherPredictionNetwork:
     def __init__(self, layers, activations, seed=None, l2_lambda=0.01):
-        if seed is not None:
+        if seed:
+            if isinstance(seed, (np.ndarray, cp.ndarray)):
+                seed = int(seed.get() if isinstance(seed, cp.ndarray) else seed)
             cp.random.seed(seed)
 
         self.num_layers = len(layers)
@@ -99,18 +101,34 @@ class WeatherPredictionNetwork:
         for i in range(len(self.weights)):
             self.weights[i] = cp.clip(self.weights[i], -clip_value, clip_value)
 
-    def train(self, X, y, epochs, learning_rate):
+    def train(self, X, y, X_test, y_test, epochs, learning_rate, batch_size=32):
+        num_samples = X.shape[0]
         for epoch in range(epochs):
-            if epoch % 5000 == 0:
+            permutation = cp.random.permutation(num_samples)
+            X_shuffled = X[permutation]
+            y_shuffled = y[permutation]
+
+            for i in range(0, num_samples, batch_size): 
+                X_batch = X_shuffled[i:i + batch_size]
+                y_batch = y_shuffled[i:i + batch_size]
+                output = self.forward(X_batch)
+                self.backward(X_batch, y_batch, output, learning_rate)
+                # self.clip_weights()
+
+            if epoch % 2500 == 0:
                 learning_rate = learning_rate / 10
-            output = self.forward(X)
-            self.backward(X, y, output, learning_rate)
-            self.clip_weights()
 
             if epoch % 100 == 0:
+                output = self.forward(X)
                 reg_loss = cp.mean(cp.abs(y[:, 0] - output[:, 0]))
                 auc = roc_auc_score(cp.asnumpy(y[:, 1]), cp.asnumpy(output[:, 1]))
                 print(f"Epoch {epoch}, Regression Loss: {reg_loss}, Classification AUC: {auc}, Learning Rate: {learning_rate}")
+
+            if epoch % 1000 == 0:
+                predictions = self.predict(X_test)
+                mae = cp.mean(cp.abs(predictions[:, 0] - y_test[:, 0]))
+                auc = roc_auc_score(cp.asnumpy(y_test[:, 1]), cp.asnumpy(predictions[:, 1]))
+                print(f"Test Regression MAE: {mae}" + f", Test Classification AUC: {auc}")
 
     def predict(self, X):
         output = self.forward(X)
