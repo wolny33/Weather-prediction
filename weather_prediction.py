@@ -115,7 +115,7 @@ class WeatherPredictionNetwork:
                 self.backward(X_batch, y_batch, output, learning_rate)
                 # self.clip_weights()
 
-            if epoch % 2500 == 0:
+            if epoch % 500 == 0:
                 learning_rate = learning_rate / 10
 
             if epoch % 100 == 0:
