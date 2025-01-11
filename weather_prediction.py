@@ -99,21 +99,23 @@ class WeatherPredictionNetwork:
         for i in range(len(self.weights)):
             self.weights[i] = cp.clip(self.weights[i], -clip_value, clip_value)
 
-    def train(self, X, y, epochs, learning_rate):
+    def train(self, X, y, epochs, learning_rate,lower_rate = 500):
+        lower_rate = 500
         for epoch in range(epochs):
-            if epoch % 5000 == 0:
+            if epoch == lower_rate:
                 learning_rate = learning_rate / 10
             output = self.forward(X)
             self.backward(X, y, output, learning_rate)
-            self.clip_weights()
+            #self.clip_weights()
 
             if epoch % 100 == 0:
                 reg_loss = cp.mean(cp.abs(y[:, 0] - output[:, 0]))
+                #reg_loss2 = cp.mean(cp.abs(y[:, 1] - output[:, 1]))
                 auc = roc_auc_score(cp.asnumpy(y[:, 1]), cp.asnumpy(output[:, 1]))
                 print(f"Epoch {epoch}, Regression Loss: {reg_loss}, Classification AUC: {auc}, Learning Rate: {learning_rate}")
 
     def predict(self, X):
         output = self.forward(X)
         reg_output = output[:, 0]
-        cls_output = (output[:, 1] >= 0.5).astype(cp.float32)
+        cls_output = (output[:, 1]).astype(cp.float32)
         return cp.hstack([reg_output[:, None], cls_output[:, None]])
