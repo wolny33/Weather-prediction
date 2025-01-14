@@ -99,7 +99,7 @@ class WeatherPredictionNetwork:
         for i in range(len(self.weights)):
             self.weights[i] = cp.clip(self.weights[i], -clip_value, clip_value)
 
-    def train(self, X, y, epochs, learning_rate,lower_rate = [500]):
+    def train(self, X, y, epochs, learning_rate, lower_rate = [500]):
 
         for epoch in range(epochs):
             if epoch in lower_rate:
