@@ -3,10 +3,8 @@ import cupy as cp
 from sklearn.metrics import roc_auc_score
 
 class WeatherPredictionNetwork:
-    def __init__(self, layers, activations, seed=None, l2_lambda=0.01):
-        if seed:
-            if isinstance(seed, (np.ndarray, cp.ndarray)):
-                seed = int(seed.get() if isinstance(seed, cp.ndarray) else seed)
+    def __init__(self, layers, activations, binary_output, seed=None, l2_lambda=0.01):
+        if seed is not None:
             cp.random.seed(seed)
 
         self.num_layers = len(layers)
@@ -14,6 +12,7 @@ class WeatherPredictionNetwork:
         self.biases = []
         self.activations = activations
         self.l2_lambda = l2_lambda
+        self.binary_output = binary_output
 
         for i in range(self.num_layers - 1):
             limit = cp.sqrt(6 / (layers[i] + layers[i + 1]))
@@ -59,7 +58,10 @@ class WeatherPredictionNetwork:
         
         z_reg, z_cls = z_last[:, 0:1], z_last[:, 1:]
         a_reg = self.apply_activation(z_reg, "linear")
-        a_cls = self.apply_activation(z_cls, "sigmoid")
+        if self.binary_output:
+            a_cls = self.apply_activation(z_cls, "sigmoid")
+        else:
+            a_cls = self.apply_activation(z_cls, "linear")
         
         self.activations_values.append(cp.hstack([a_reg, a_cls]))
 
@@ -69,13 +71,20 @@ class WeatherPredictionNetwork:
         deltas = []
 
         y_reg, y_cls = y[:, 0:1], y[:, 1:]
-        output_reg, output_cls = output[:, 0:1], cp.clip(output[:, 1:], 1e-9, 1 - 1e-9)
+        if self.binary_output:
+            output_reg, output_cls = output[:, 0:1], cp.clip(output[:, 1:], 1e-9, 1 - 1e-9)
+        else:
+            output_reg, output_cls = output[:, 0:1], output[:, 1:]
 
         reg_error = y_reg - output_reg
         reg_delta = reg_error * self.apply_activation_derivative(output_reg, "linear")
 
-        cls_error = y_cls - output_cls
-        cls_delta = cls_error * self.apply_activation_derivative(output_cls, "sigmoid")
+        if self.binary_output:
+            cls_error = y_cls - output_cls
+            cls_delta = cls_error * self.apply_activation_derivative(output_cls, "sigmoid")
+        else:
+            cls_error = y_cls - output_cls
+            cls_delta = cls_error * self.apply_activation_derivative(output_cls, "linear")
 
         output_delta = cp.hstack([reg_delta, cls_delta])
         deltas.append(output_delta)
@@ -121,8 +130,16 @@ class WeatherPredictionNetwork:
             if epoch % 100 == 0:
                 output = self.forward(X)
                 reg_loss = cp.mean(cp.abs(y[:, 0] - output[:, 0]))
-                auc = roc_auc_score(cp.asnumpy(y[:, 1]), cp.asnumpy(output[:, 1]))
-                print(f"Epoch {epoch}, Regression Loss: {reg_loss}, Classification AUC: {auc}, Learning Rate: {learning_rate}")
+                if self.binary_output:
+                    reg_loss2 = cp.mean(cp.abs(y[:, 1] - output[:, 1]))
+                    auc = roc_auc_score(cp.asnumpy(y[:, 1]), cp.asnumpy(output[:, 1]))
+                    print(f"Epoch {epoch}, Regression Loss: {reg_loss}, Classification AUC: {auc}, Learning Rate: {learning_rate}")
+                else:
+                    reg_loss2 = cp.mean(cp.abs(y[:, 1] - output[:, 1]))
+                    cls_binary_output = (cp.asnumpy(output[:, 1]) >= 6).astype(cp.float32)
+                    y_bin = (cp.asnumpy(y[:, 1]) >= 6).astype(cp.float32)
+                    auc = roc_auc_score(y_bin, cls_binary_output)
+                    print(f"Epoch {epoch}, Regression Loss: {reg_loss}, Regression Loss2: {reg_loss2}, Classification AUC: {auc}, Learning Rate: {learning_rate}")
 
             if epoch % 1000 == 0:
                 predictions = self.predict(X_test)
@@ -133,5 +150,8 @@ class WeatherPredictionNetwork:
     def predict(self, X):
         output = self.forward(X)
         reg_output = output[:, 0]
-        cls_output = (output[:, 1] >= 0.5).astype(cp.float32)
+        if self.binary_output:
+            cls_output = (output[:, 1]).astype(cp.float32)
+        else:
+            cls_output = (output[:, 1] >= 6).astype(cp.float32)
         return cp.hstack([reg_output[:, None], cls_output[:, None]])
