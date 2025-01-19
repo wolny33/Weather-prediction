@@ -143,7 +143,12 @@ class WeatherPredictionNetwork:
             if epoch % 100 == 0:
                 predictions = self.predict(X_test)
                 mae = cp.mean(cp.abs(predictions[:, 0] - y_test[:, 0]))
-                auc = roc_auc_score(cp.asnumpy(y_test[:, 1]), cp.asnumpy(predictions[:, 1]))
+                if self.binary_output:
+                    auc = roc_auc_score(cp.asnumpy(y_test[:, 1]), cp.asnumpy(predictions[:, 1]))
+                else:
+                    cls_binary_output = (cp.asnumpy(predictions[:, 1]) >= 6).astype(cp.float32)
+                    y_bin = (cp.asnumpy(y_test[:, 1]) >= 6).astype(cp.float32)
+                    auc = roc_auc_score(y_bin, cls_binary_output)
                 print(f"Test Regression MAE: {mae}" + f", Test Classification AUC: {auc}")
 
     def predict(self, X):
