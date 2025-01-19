@@ -110,9 +110,11 @@ class WeatherPredictionNetwork:
         for i in range(len(self.weights)):
             self.weights[i] = cp.clip(self.weights[i], -clip_value, clip_value)
 
-    def train(self, X, y, X_test, y_test, epochs, learning_rate, batch_size=32):
+    def train(self, X, y, X_test, y_test, epochs, learning_rate, lower_rate=[2500], batch_size=32):
         num_samples = X.shape[0]
         for epoch in range(epochs):
+            if epoch in lower_rate:
+                learning_rate = learning_rate / 10
             permutation = cp.random.permutation(num_samples)
             X_shuffled = X[permutation]
             y_shuffled = y[permutation]
@@ -124,10 +126,7 @@ class WeatherPredictionNetwork:
                 self.backward(X_batch, y_batch, output, learning_rate)
                 # self.clip_weights()
 
-            if epoch % 500 == 0:
-                learning_rate = learning_rate / 10
-
-            if epoch % 100 == 0:
+            if epoch % 10 == 0:
                 output = self.forward(X)
                 reg_loss = cp.mean(cp.abs(y[:, 0] - output[:, 0]))
                 if self.binary_output:
@@ -141,7 +140,7 @@ class WeatherPredictionNetwork:
                     auc = roc_auc_score(y_bin, cls_binary_output)
                     print(f"Epoch {epoch}, Regression Loss: {reg_loss}, Regression Loss2: {reg_loss2}, Classification AUC: {auc}, Learning Rate: {learning_rate}")
 
-            if epoch % 1000 == 0:
+            if epoch % 100 == 0:
                 predictions = self.predict(X_test)
                 mae = cp.mean(cp.abs(predictions[:, 0] - y_test[:, 0]))
                 auc = roc_auc_score(cp.asnumpy(y_test[:, 1]), cp.asnumpy(predictions[:, 1]))
@@ -151,6 +150,7 @@ class WeatherPredictionNetwork:
         output = self.forward(X)
         reg_output = output[:, 0]
         if self.binary_output:
+            # cls_output = (output[:, 1] >= 0.5).astype(cp.float32)
             cls_output = (output[:, 1]).astype(cp.float32)
         else:
             cls_output = (output[:, 1] >= 6).astype(cp.float32)
