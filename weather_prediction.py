@@ -126,7 +126,7 @@ class WeatherPredictionNetwork:
                 self.backward(X_batch, y_batch, output, learning_rate)
                 # self.clip_weights()
 
-            if epoch % 10 == 0:
+            if epoch % 20000 == 0:
                 output = self.forward(X)
                 reg_loss = cp.mean(cp.abs(y[:, 0] - output[:, 0]))
                 if self.binary_output:
@@ -140,7 +140,7 @@ class WeatherPredictionNetwork:
                     auc = roc_auc_score(y_bin, cls_binary_output)
                     print(f"Epoch {epoch}, Regression Loss: {reg_loss}, Regression Loss2: {reg_loss2}, Classification AUC: {auc}, Learning Rate: {learning_rate}")
 
-            if epoch % 100 == 0:
+            if epoch % 20000 == 0:
                 predictions = self.predict(X_test)
                 mae = cp.mean(cp.abs(predictions[:, 0] - y_test[:, 0]))
                 if self.binary_output:
