@@ -15,12 +15,12 @@ class WeatherPredictionNetwork:
         self.l2_lambda = l2_lambda
         self.binary_output = binary_output
 
-        self.weight_error_history = []  # Initialize for weight updates
-        self.bias_error_history = []    # Initialize for bias updates
-        self.training_mae = []  # Track MAE for training
-        self.training_auc = []  # Track AUC for training
-        self.testing_mae = []  # Track MAE for testing
-        self.testing_auc = []  # Track AUC for testing
+        self.weight_error_history = []
+        self.bias_error_history = []
+        self.training_mae = []
+        self.training_auc = []
+        self.testing_mae = []
+        self.testing_auc = []
 
         for i in range(self.num_layers - 1):
             limit = cp.sqrt(6 / (layers[i] + layers[i + 1]))
@@ -111,7 +111,6 @@ class WeatherPredictionNetwork:
             grad_w = cp.clip(grad_w, -1.0, 1.0)
             grad_b = cp.clip(grad_b, -1.0, 1.0)
 
-            # Append the norms of gradients to history
             self.weight_error_history.append(cp.linalg.norm(grad_w))
             self.bias_error_history.append(cp.linalg.norm(grad_b))
 
@@ -123,8 +122,8 @@ class WeatherPredictionNetwork:
             self.weights[i] = cp.clip(self.weights[i], -clip_value, clip_value)
 
     def plot_error_history(self):
-        weight_error_history = cp.array(self.weight_error_history).get()  # Convert to NumPy
-        bias_error_history = cp.array(self.bias_error_history).get()  # Convert to NumPy
+        weight_error_history = cp.array(self.weight_error_history).get()
+        bias_error_history = cp.array(self.bias_error_history).get()
 
         def running_mean(data, window_size):
             return np.convolve(data, np.ones(window_size)/window_size, mode='valid')
@@ -173,7 +172,6 @@ class WeatherPredictionNetwork:
                 self.backward(X_batch, y_batch, output, learning_rate)
 
             if epoch % 100 == 0:
-                # Training metrics
                 output = self.forward(X)
                 train_mae = cp.mean(cp.abs(y[:, 0] - output[:, 0])).get()
                 if self.binary_output:
@@ -186,7 +184,6 @@ class WeatherPredictionNetwork:
                 self.training_mae.append(train_mae)
                 self.training_auc.append(train_auc)
 
-                # Testing metrics
                 predictions = self.predict(X_test)
                 test_mae = cp.mean(cp.abs(predictions[:, 0] - y_test[:, 0])).get()
                 if self.binary_output:
@@ -205,10 +202,6 @@ class WeatherPredictionNetwork:
 
     def plot_training_testing_metrics(self):
         epochs = range(0, len(self.training_mae) * 100, 100)
-        print("Training MAE:", self.training_mae)  # Debug print
-        print("Testing MAE:", self.testing_mae)    # Debug print
-        print("Training AUC:", self.training_auc)  # Debug print
-        print("Testing AUC:", self.testing_auc)    # Debug print
 
         plt.figure(figsize=(12, 6))
 
@@ -238,8 +231,7 @@ class WeatherPredictionNetwork:
         output = self.forward(X)
         reg_output = output[:, 0]
         if self.binary_output:
-            # cls_output = (output[:, 1] >= 0.5).astype(cp.float32)
             cls_output = (output[:, 1]).astype(cp.float32)
         else:
-            cls_output = (output[:, 1] >= 6).astype(cp.float32)
+            cls_output = (output[:, 1]).astype(cp.float32)
         return cp.hstack([reg_output[:, None], cls_output[:, None]])
